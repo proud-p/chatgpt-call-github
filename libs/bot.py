@@ -19,31 +19,14 @@ AZURE_CLIENT = AzureOpenAI(
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 
-def get_github_repo(GITHUB_TOKEN,):# GitHub GraphQL API endpoint
+def get_github_repo(GITHUB_TOKEN,query_string):# GitHub GraphQL API endpoint
     GRAPHQL_URL = "https://api.github.com/graphql"
 
     # Replace with your GitHub personal access token
 
 
     # GraphQL query string
-    query_string = """
-    {
-    search(query: "touchdesigner glsl in:readme", type: REPOSITORY, first: 10) {
-        edges {
-        node {
-            ... on Repository {
-            name
-            owner {
-                login
-            }
-            url
-            description
-            }
-        }
-        }
-    }
-    }
-    """
+    
 
     # Headers for authorization
     headers = {
@@ -74,30 +57,31 @@ def get_github_repo(GITHUB_TOKEN,):# GitHub GraphQL API endpoint
     return response.json()
 
 messages = [
-    {"role": "system", "content": "Respond to everything as a short poem"},
+        {
+        "role": "system",
+        "content":"Respond to everything as a short poem"
+    }
+
+    ,
     {"role": "user", "content": "Find the github repo that integrates glsl with touchdesigner"}
 ]
 
 functions = [
-    {
+        {
         "type": "function",
         "function": {
-            "name": "get_crypto_price",
-            "description": "Get prices of cryptocurrency in a specified global currency"
+            "name": "get_github_repo",
+            "description": "Get GitHub repositories based on a user's natural language description."
         },
         "parameters": {
             "type": "object",
             "properties": {
-                "crypto_name": {
+                "query": {
                     "type": "string",
-                    "description": "The name of the crypto currency that I want to look for"
-                },
-                "fiat_currency": {
-                    "type": "string",
-                    "description": "The fiat currency for defining the price of crypto currency"
+                    "description": "A GraphQL query string formatted for the GitHub API. For example: { search(query: \"touchdesigner glsl in:readme\", type: REPOSITORY, first: 10) { edges { node { name owner { login } url description } } } }"
                 }
             },
-            "required": ["crypto_name", "fiat_currency"]
+            "required": ["query"]
         }
     }
 ]
@@ -116,7 +100,7 @@ print(response_message)
 
 if gpt_tools:
     available_functions = {
-        "get_crypto_price": get_github_repo
+        "get_github_repo": get_github_repo
     }
 
     messages.append(response_message)
