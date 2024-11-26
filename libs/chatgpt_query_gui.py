@@ -165,30 +165,45 @@ class FunctionParameterApp:
     def update_json_view(self):
         result = []
         for _, func in self.functions_df.iterrows():
+            # Filter parameters for the current function
             params = self.parameters_df[self.parameters_df["function"] == func["name"]]
+
+            # Build properties object with parameter details
             properties = {}
- 
             for _, param in params.iterrows():
                 properties[param["name"]] = {
                     "type": param["type"],
                     "description": param["description"],
                 }
-            
-            # list of required parameters
-            required_params = list(params[params["required"]]["name"])
-            # add params list to func for each func
+
+            if params.shape[0]:
+                # Extract list of required parameters
+                print(params)
+                required_params = list(params[params["required"]]["name"])
+
+            # Append the formatted function object to the result list
             result.append(
                 {
                     "type": "function",
-                    "function": {"name": func["name"], "description": func["description"]},
-                    "parameters": {"type": "object", "properties": properties,"required":required_params},
+                    "function": {
+                        "name": func["name"],
+                        "description": func["description"],
+                        "parameters": {
+                            "type": "object",
+                            "properties": properties,
+                            "required": required_params,
+                        },
+                    },
                 }
             )
+
+        # Convert the result to JSON and display it in the text box
         json_output = json.dumps(result, indent=4)
         self.json_text.config(state=tk.NORMAL)
         self.json_text.delete("1.0", tk.END)
         self.json_text.insert(tk.END, json_output)
         self.json_text.config(state=tk.DISABLED)
+
 
 
 if __name__ == "__main__":
