@@ -144,3 +144,6 @@ GitHub is a powerful resource for developers, but querying it effectively can be
    - Include user authentication for private repository searches.
 
 By addressing these improvements, this tool can evolve into a comprehensive solution for developers of all skill levels, transforming how they search and interact with GitHub's vast ecosystem.
+
+## **Disclaimer**
+ChatGPT was used in the writing of this code.
