@@ -167,7 +167,7 @@ class FunctionParameterApp:
         for _, func in self.functions_df.iterrows():
             params = self.parameters_df[self.parameters_df["function"] == func["name"]]
             properties = {}
-            print(params)
+ 
             for _, param in params.iterrows():
                 properties[param["name"]] = {
                     "type": param["type"],
