@@ -22,25 +22,26 @@ def nlp_to_query(question):
     messages = [
         {
             "role": "system",
-            "content": """Convert the user's interest or question into a GraphQL query to use with the GitHub API. Always format the response as QUERY: followed by the query string. For example:
+            "content": """Convert the user's interest or question into a GraphQL query to use with the GitHub API. Always format the response as QUERY: followed by the query string. first in query string always = 10, For example:
 
                             QUERY:
-                            query_string = \"""
-                            {
-                                search(query: "glsl touchdesigner in:readme", type: REPOSITORY, first: 10) {
+                             {
+                                search(query: "touchdesigner glsl in:readme", type: REPOSITORY, first: 10) {
                                     edges {
-                                        node {
-                                            name
-                                            owner {
-                                                login
-                                            }
-                                            url
-                                            description
+                                    node {
+                                        ... on Repository {
+                                        name
+                                        owner {
+                                            login
+                                        }
+                                        url
+                                        description
                                         }
                                     }
+                                    }
                                 }
-                            }
-                            \"""
+                                }
+                           
                     """
         },
         {"role": "user", "content": question}
@@ -55,11 +56,13 @@ def nlp_to_query(question):
     print("Response from Azure OpenAI:", response)
 
     # Extract query string from the response
-    response_text = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+    response_text = response.choices[0].message.content
     if "QUERY:" not in response_text:
+        print(response_text)
         raise ValueError("No QUERY found in the response.")
-
-    query_string = response_text.split("QUERY:")[1].strip()
+    
+    else:
+        query_string = response_text.split("QUERY:")[1].strip()
     return query_string
 
 
@@ -86,7 +89,7 @@ def get_github_repo(question):
         headers=headers
     )
 
-    # Process the API response
+    # Process the Github API response
     if response.status_code == 200:
         data = response.json()
         for edge in data["data"]["search"]["edges"]:
@@ -99,7 +102,7 @@ def get_github_repo(question):
     else:
         print(f"Error: {response.status_code}")
         print(response.json())
-    return response.json()
+
 
 
 # Chat messages and functions
