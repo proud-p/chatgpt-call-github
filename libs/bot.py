@@ -104,7 +104,7 @@ def get_github_repo(question):
         print(response.json())
 
 
-
+# INPUT MESSAGES MAIN
 # Chat messages and functions
 messages = [
     {
@@ -113,7 +113,7 @@ messages = [
     },
     {
         "role": "user",
-        "content": "Find the GitHub repo that integrates GLSL with TouchDesigner."
+        "content": input("What type of Github Repositories do you want to find?")
     }
 ]
 
