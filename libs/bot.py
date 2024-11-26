@@ -10,22 +10,68 @@ os.chdir("../")
 load_dotenv()
 
 
+global AZURE_CLIENT, GITHUB_TOKEN
 AZURE_CLIENT = AzureOpenAI(
-    api_key=os.getenv("AZURE_KEY"),
-    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
-    api_version="2023-10-01-preview"
-)
+        api_key=os.getenv("AZURE_KEY"),
+        azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+        api_version="2023-10-01-preview"
+    )
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
+# -----------
 
-def get_github_repo(GITHUB_TOKEN,query_string):# GitHub GraphQL API endpoint
+
+def nlp_to_query(question):
+    messages = [
+        {
+            "role": "system",
+            "content": """Convert the user's interest or question into a GraphQL query to use with the GitHub API. For example:
+                                    
+                            User Input: "I want to create a water-like texture procedurally in TouchDesigner so I can VJ."
+                            System Response: "To look at this, you can explore repositories integrating GLSL into TouchDesigner. QUERY:
+                            query_string = \"""
+                            {
+                            search(query: "glsl touchdesigner in:readme", type: REPOSITORY, first: 10) {
+                                edges {
+                                node {
+                                    name
+                                    owner {
+                                    login
+                                    }
+                                    url
+                                    description
+                                }
+                                }
+                            }
+                            }
+                            \"\"\"
+
+                            or
+
+                            For example: { search(query: \"touchdesigner glsl in:readme\", type: REPOSITORY, first: 10) { edges { node { name owner { login } url description } } } }
+
+                        Always format your response with the QUERY after 'QUERY:' so it can be parsed later."""
+                    },
+                    {"role": "user", "content": question}
+                ]
+
+    response = AZURE_CLIENT.chat.completions.create(
+    model="GPT-4",
+    messages=messages
+    )
+
+
+def get_github_repo(question):# GitHub GraphQL API endpoint
+    # Get GraphQL query string from question using chatgpt
+
+    # -------- deal with getting github repo-------
+
     GRAPHQL_URL = "https://api.github.com/graphql"
+    response_and_query = nlp_to_query(question)
+    print(response_and_query)
 
-    # Replace with your GitHub personal access token
-
-
-    # GraphQL query string
+    query_string = response_and_query.split("QUERY:")[1]
     
 
     # Headers for authorization
@@ -76,12 +122,12 @@ functions = [
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {
+                "question": {
                     "type": "string",
-                    "description": "A GraphQL query string formatted for the GitHub API. For example: { search(query: \"touchdesigner glsl in:readme\", type: REPOSITORY, first: 10) { edges { node { name owner { login } url description } } } }"
+                    "description": "Question user is interested in asking, for example, I want to create patterns on the web can be translated to using p5.js or using glsl shaders for the web. "
                 }
             },
-            "required": ["query"]
+            "required": ["question"]
         }
     }
 ]
