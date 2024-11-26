@@ -4,90 +4,89 @@ from dotenv import load_dotenv
 import json
 import requests
 
-os.chdir("../")
-
-# Get Authentications
+# Load environment variables
 load_dotenv()
 
-
-global AZURE_CLIENT, GITHUB_TOKEN
+# Global variables
 AZURE_CLIENT = AzureOpenAI(
-        api_key=os.getenv("AZURE_KEY"),
-        azure_endpoint=os.getenv("AZURE_ENDPOINT"),
-        api_version="2023-10-01-preview"
-    )
+    api_key=os.getenv("AZURE_KEY"),
+    azure_endpoint=os.getenv("AZURE_ENDPOINT"),
+    api_version="2023-10-01-preview"
+)
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# -----------
 
-
+# Convert user's question into a GraphQL query string
 def nlp_to_query(question):
     messages = [
         {
             "role": "system",
-            "content": """Convert the user's interest or question into a GraphQL query to use with the GitHub API. For example:
-                                    
-                            User Input: "I want to create a water-like texture procedurally in TouchDesigner so I can VJ."
-                            System Response: "To look at this, you can explore repositories integrating GLSL into TouchDesigner. QUERY:
+            "content": """Convert the user's interest or question into a GraphQL query to use with the GitHub API. Always format the response as QUERY: followed by the query string. For example:
+
+                            QUERY:
                             query_string = \"""
                             {
-                            search(query: "glsl touchdesigner in:readme", type: REPOSITORY, first: 10) {
-                                edges {
-                                node {
-                                    name
-                                    owner {
-                                    login
+                                search(query: "glsl touchdesigner in:readme", type: REPOSITORY, first: 10) {
+                                    edges {
+                                        node {
+                                            name
+                                            owner {
+                                                login
+                                            }
+                                            url
+                                            description
+                                        }
                                     }
-                                    url
-                                    description
-                                }
                                 }
                             }
-                            }
-                            \"\"\"
-
-                            or
-
-                            For example: { search(query: \"touchdesigner glsl in:readme\", type: REPOSITORY, first: 10) { edges { node { name owner { login } url description } } } }
-
-                        Always format your response with the QUERY after 'QUERY:' so it can be parsed later."""
-                    },
-                    {"role": "user", "content": question}
-                ]
+                            \"""
+                    """
+        },
+        {"role": "user", "content": question}
+    ]
 
     response = AZURE_CLIENT.chat.completions.create(
-    model="GPT-4",
-    messages=messages
+        model="GPT-4",
+        messages=messages
     )
 
+    # Debugging response
+    print("Response from Azure OpenAI:", response)
 
-def get_github_repo(question):# GitHub GraphQL API endpoint
-    # Get GraphQL query string from question using chatgpt
+    # Extract query string from the response
+    response_text = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+    if "QUERY:" not in response_text:
+        raise ValueError("No QUERY found in the response.")
 
-    # -------- deal with getting github repo-------
+    query_string = response_text.split("QUERY:")[1].strip()
+    return query_string
 
+
+# Function to fetch GitHub repositories using GraphQL query
+def get_github_repo(question):
+    print("QUESTION")
+    print(question)
     GRAPHQL_URL = "https://api.github.com/graphql"
-    response_and_query = nlp_to_query(question)
-    print(response_and_query)
 
-    query_string = response_and_query.split("QUERY:")[1]
-    
+    # Get GraphQL query from user's question
+    query_string = nlp_to_query(question)
 
-    # Headers for authorization
+    print("Generated GraphQL Query:", query_string)
+
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Content-Type": "application/json",
     }
 
-    # Make the request
+    # Make the API request
     response = requests.post(
         GRAPHQL_URL,
         json={"query": query_string},
         headers=headers
     )
 
-    # Process the response
+    # Process the API response
     if response.status_code == 200:
         data = response.json()
         for edge in data["data"]["search"]["edges"]:
@@ -102,36 +101,44 @@ def get_github_repo(question):# GitHub GraphQL API endpoint
         print(response.json())
     return response.json()
 
-messages = [
-        {
-        "role": "system",
-        "content":"Respond to everything as a short poem"
-    }
 
-    ,
-    {"role": "user", "content": "Find the github repo that integrates glsl with touchdesigner"}
+# Chat messages and functions
+messages = [
+    {
+        "role": "system",
+        "content": "Respond to everything as a short poem."
+    },
+    {
+        "role": "user",
+        "content": "Find the GitHub repo that integrates GLSL with TouchDesigner."
+    }
 ]
+
 
 functions = [
-        {
-        "type": "function",
-        "function": {
-            "name": "get_github_repo",
-            "description": "Get GitHub repositories based on a user's natural language description."
-        },
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "question": {
-                    "type": "string",
-                    "description": "Question user is interested in asking, for example, I want to create patterns on the web can be translated to using p5.js or using glsl shaders for the web. "
-                }
-            },
-            "required": ["question"]
-        }
-    }
+	{
+		"type": "function",
+		"function": {
+			"name": "get_github_repo",
+			"description":  "Get GitHub repositories based on a user's natural language description.",
+			"parameters": {
+				# lettings chat-gpt know that it's getting
+				# key-value pairs
+				"type": "object",
+				"properties": {
+					"question": {
+						"type": "string",
+						"description": "A user's question describing the type of repository they are looking for. For example: 'I want to create patterns on the web using GLSL shaders.'"
+					},
+				
+				},
+				"required": ["question"]
+			}
+		}
+	}
 ]
 
+# Handle GPT's response and execute functions
 response = AZURE_CLIENT.chat.completions.create(
     model="GPT-4",
     messages=messages,
@@ -142,7 +149,8 @@ response = AZURE_CLIENT.chat.completions.create(
 gpt_tools = response.choices[0].message.tool_calls
 response_message = response.choices[0].message
 
-print(response_message)
+# Print GPT's initial response
+print("GPT Response:", response_message)
 
 if gpt_tools:
     available_functions = {
@@ -150,41 +158,38 @@ if gpt_tools:
     }
 
     messages.append(response_message)
-
+    print("GPT TOOLS!")
+    print(gpt_tools)
     for gpt_tool in gpt_tools:
         function_name = gpt_tool.function.name
         function_to_call = available_functions[function_name]
         function_parameters = json.loads(gpt_tool.function.arguments)
-        print('FUNCTION PARAMS')
+
+        print("FUNCTION PARAMETERS:")
         print(function_parameters)
 
-        # Fixing parameter names
-        crypto_name = function_parameters.get('crypto_name')
-        fiat_currency = function_parameters.get('fiat_currency')
+        # Extract the question parameter
+        question = function_parameters.get("question")
 
-        function_response = function_to_call(crypto_name, fiat_currency)
+        # Call the function
+        function_response = function_to_call(question)
 
+        # Add the function response to the messages
         messages.append(
             {
                 "tool_call_id": gpt_tool.id,
                 "role": "tool",
                 "name": function_name,
-                "content": function_response
+                "content": json.dumps(function_response, indent=4)
             }
         )
 
+        # Get a final response from GPT using the function's output
         second_response = AZURE_CLIENT.chat.completions.create(
             model="GPT-4",
             messages=messages
         )
-
+        print("Second GPT Response:", second_response.choices[0].message)
 else:
     print(response.choices[0].message)
-
-
-
-
-
-
-
 
